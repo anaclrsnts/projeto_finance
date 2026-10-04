@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="description"
+        content="Dashboard financeiro pessoal desenvolvido com Flask, SQLite e JavaScript."
+    >
+    <title>Meu Financeiro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Dashboard financeiro pessoal</p>
+                <h1>Meu Financeiro</h1>
+                <p class="subtitle">Organize receitas, despesas e acompanhe sua evolução mensal.</p>
+            </div>
+
+            <div class="topbar-actions">
+                <button id="demo-button" class="button secondary" type="button">
+                    Carregar demonstração
+                </button>
+                <a class="button secondary" href="/api/export">
+                    Exportar CSV
+                </a>
+                <button id="new-transaction-button" class="button primary" type="button">
+                    Novo lançamento
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <section class="summary-grid" aria-label="Resumo financeiro">
+                <article class="summary-card">
+                    <span>Saldo atual</span>
+                    <strong id="balance-value">R$ 0,00</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span>Total de receitas</span>
+                    <strong id="income-value">R$ 0,00</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span>Total de despesas</span>
+                    <strong id="expenses-value">R$ 0,00</strong>
+                </article>
+            </section>
+
+            <section class="dashboard-grid">
+                <article class="panel">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">Visão geral</p>
+                            <h2>Receitas e despesas por mês</h2>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">Distribuição</p>
+                            <h2>Despesas por categoria</h2>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper compact">
+                        <canvas id="category-chart"></canvas>
+                    </div>
+                </article>
+            </section>
+
+            <section class="panel transactions-panel">
+                <div class="panel-heading split">
+                    <div>
+                        <p class="eyebrow">Histórico</p>
+                        <h2>Lançamentos</h2>
+                    </div>
+
+                    <form id="filters-form" class="filters">
+                        <label>
+                            <span>Mês</span>
+                            <input id="filter-month" type="month">
+                        </label>
+
+                        <label>
+                            <span>Tipo</span>
+                            <select id="filter-type">
+                                <option value="">Todos</option>
+                                <option value="receita">Receitas</option>
+                                <option value="despesa">Despesas</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            <span>Categoria</span>
+                            <select id="filter-category">
+                                <option value="">Todas</option>
+                            </select>
+                        </label>
+
+                        <label class="search-field">
+                            <span>Buscar</span>
+                            <input
+                                id="filter-search"
+                                type="search"
+                                placeholder="Descrição ou observação"
+                            >
+                        </label>
+
+                        <button id="clear-filters" class="button ghost" type="button">
+                            Limpar
+                        </button>
+                    </form>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th class="actions-column">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-body"></tbody>
+                    </table>
+
+                    <div id="empty-state" class="empty-state" hidden>
+                        <h3>Nenhum lançamento encontrado</h3>
+                        <p>Cadastre um lançamento ou altere os filtros para visualizar resultados.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="modal-backdrop" class="modal-backdrop">
+        <section
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+        >
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">Lançamento</p>
+                    <h2 id="modal-title">Novo lançamento</h2>
+                </div>
+                <button id="close-modal-button" class="icon-button" type="button" aria-label="Fechar">
+                    ×
+                </button>
+            </div>
+
+            <form id="transaction-form">
+                <input id="transaction-id" type="hidden">
+
+                <div class="form-grid">
+                    <label class="full-width">
+                        <span>Descrição</span>
+                        <input
+                            id="description"
+                            name="description"
+                            type="text"
+                            maxlength="80"
+                            required
+                            placeholder="Ex.: Mercado do mês"
+                        >
+                    </label>
+
+                    <label>
+                        <span>Valor</span>
+                        <input
+                            id="amount"
+                            name="amount"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            required
+                            placeholder="0,00"
+                        >
+                    </label>
+
+                    <label>
+                        <span>Tipo</span>
+                        <select id="type" name="type" required>
+                            <option value="despesa">Despesa</option>
+                            <option value="receita">Receita</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Categoria</span>
+                        <input
+                            id="category"
+                            name="category"
+                            list="category-options"
+                            required
+                            placeholder="Ex.: Alimentação"
+                        >
+                        <datalist id="category-options"></datalist>
+                    </label>
+
+                    <label>
+                        <span>Data</span>
+                        <input id="transaction-date" name="transaction_date" type="date" required>
+                    </label>
+
+                    <label class="full-width">
+                        <span>Observações</span>
+                        <textarea
+                            id="notes"
+                            name="notes"
+                            rows="3"
+                            maxlength="250"
+                            placeholder="Campo opcional"
+                        ></textarea>
+                    </label>
+                </div>
+
+                <p id="form-error" class="form-error" hidden></p>
+
+                <div class="modal-actions">
+                    <button id="cancel-button" class="button secondary" type="button">
+                        Cancelar
+                    </button>
+                    <button class="button primary" type="submit">
+                        Salvar lançamento
+                    </button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
